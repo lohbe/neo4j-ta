@@ -140,7 +140,7 @@ def _(mo):
 
     ### Model Constraints
 
-    Neo4j only supports four constraint kinds: uniqueness, node-key, existence, and type.
+    Neo4j only supports four constraint kinds: uniqueness, node-key, existence, and type. Constraints automatically create backing indexes that help speed up MATCH operations.
 
     Customer.CIF, Card.CardNumber, Account.AccountNumber are unique
     Merchant names are unique (assumed)
@@ -175,10 +175,128 @@ def _(mo):
 
 @app.cell
 def _(GraphDatabase):
-    DB = "bank"
-
-    driver = GraphDatabase.driver("bolt://localhost:7687", auth=("analyst", "Password123!"))
+    driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
     driver.verify_connectivity()
+    return (driver,)
+
+
+@app.cell
+def _(driver):
+    # Create constraints
+
+    constraints = [
+        "CREATE CONSTRAINT customer_cif IF NOT EXISTS FOR (c:Customer) REQUIRE c.cif IS UNIQUE",
+        "CREATE CONSTRAINT card_number IF NOT EXISTS FOR (c:Card) REQUIRE c.cardNumber IS UNIQUE",
+        "CREATE CONSTRAINT account_number IF NOT EXISTS FOR (a:Account) REQUIRE a.accountNumber IS UNIQUE",
+        "CREATE CONSTRAINT merchant_name IF NOT EXISTS FOR (m:Merchant) REQUIRE m.name IS UNIQUE",
+    ]
+
+    with driver.session() as _s:
+        for c in constraints:
+            _s.run(c)
+    return
+
+
+@app.cell
+def _(customers, driver):
+    # Load Customers, Cards and Accounts
+
+    _rows = customers.to_dict("records")
+    _q = """
+    UNWIND $rows AS row
+    MERGE (c:Customer {cif: row.CIF})
+      SET c.age = row.Age, c.firstName = row.FirstName, c.lastName = row.LastName,
+          c.email = row.EmailAddress, c.phone = row.PhoneNumber, c.gender = row.Gender,
+          c.address = row.Address, c.country = row.Country, c.jobTitle = row.JobTitle
+    MERGE (card:Card {cardNumber: row.CardNumber})
+    MERGE (acct:Account {accountNumber: row.AccountNumber})
+    MERGE (c)-[:HAS_CARD]->(card)
+    MERGE (c)-[:HAS_ACCOUNT]->(acct)
+    """
+    with driver.session() as _s:
+        _s.run(_q, rows=_rows)        
+    return
+
+
+@app.cell
+def _(driver, purchases):
+    # Load Merchants
+
+    _names = [{"name": n} for n in purchases["Merchant"].unique().tolist()]
+    with driver.session() as _s:
+        _s.run("UNWIND $rows AS row MERGE (:Merchant {name: row.name})", rows=_names)
+    return
+
+
+@app.cell
+def _(driver, purchases):
+    # Load Purchases; note - create node & attach to existing card + merchant.
+
+    _df = purchases.copy()
+    _df["PurchaseDatetime"] = _df["PurchaseDatetime"].dt.strftime("%Y-%m-%dT%H:%M:%S%z")
+    _rows = _df.to_dict("records")
+
+    _q = """
+    UNWIND $rows AS row
+    MATCH (card:Card {cardNumber: row.CardNumber})
+    MATCH (m:Merchant {name: row.Merchant})
+    CREATE (p:Purchase {
+        transactionId: row.TransactionID,
+        amount: row.Amount,
+        purchaseDatetime: datetime(row.PurchaseDatetime),
+        cardIssuer: row.CardIssuer
+    })
+    CREATE (card)-[:FUNDS]->(p)
+    CREATE (p)-[:PAID_TO]->(m)
+    """
+
+    with driver.session() as _s:
+        for _i in range(0, len(_rows), 1000):          # batch of 1000
+            _s.run(_q, rows=_rows[_i:_i+1000])
+    return
+
+
+@app.cell
+def _(driver, transfers):
+    # Load Transfers; note - create node, attach sender + receiver
+
+    _df = transfers.copy()
+    _df["TransferDatetime"] = _df["TransferDatetime"].dt.strftime("%Y-%m-%dT%H:%M:%S%z")
+    _rows = _df.to_dict("records")
+
+    _q = """
+    UNWIND $rows AS row
+    MATCH (sender:Account {accountNumber: row.SenderAccountNumber})
+    MATCH (receiver:Account {accountNumber: row.ReceiverAccountNumber})
+    CREATE (t:Transfer {
+        transactionId: row.TransactionID,
+        amount: row.Amount,
+        transferDatetime: datetime(row.TransferDatetime)
+    })
+    CREATE (sender)-[:SENT_TO]->(t)
+    CREATE (t)-[:RECEIVED_BY]->(receiver)
+    """
+
+    with driver.session() as _s:
+        _s.run(_q, rows=_rows)
+    return
+
+
+@app.cell
+def _(driver):
+    # Verify
+
+    with driver.session() as _s:
+            counts = _s.run("""
+                MATCH (n) RETURN labels(n)[0] AS label, count(*) AS n ORDER BY label
+            """).data()
+    counts
+    return
+
+
+@app.cell
+def _(driver):
+    driver.session().close()
     return
 
 

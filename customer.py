@@ -13,7 +13,7 @@
 import marimo
 
 __generated_with = "0.23.9"
-app = marimo.App(width="medium")
+app = marimo.App(width="medium", auto_download=["html"])
 
 
 @app.cell
@@ -479,7 +479,7 @@ def _(mo):
     mo.md(r"""
     The results appear to be a result of synthetic data generation.
     - Age spread of customers per unique merchant is 2 years
-    - The merchant shares per occupation is roughly equal
+    - The merchant shares per occupation is uniform
 
     The benefit of cypher
     - Analytics and summary statistics in a single query spanning multiple entities and relations
@@ -496,7 +496,147 @@ def _(mo):
 
 
 @app.cell
-def _():
+def _(driver):
+    # check GDS installed
+    with driver.session() as _s:
+        _o = _s.run("RETURN gds.version()").data()
+    _o
+    return
+
+
+@app.cell
+def _(driver):
+    # Community Detection with GDS
+    # create Account->Account projection 'xfer'
+
+    _q = """
+    MATCH (s:Account)-[:SENT_TO]->(tr:Transfer)-[:RECEIVED_BY]->(r:Account)
+    RETURN gds.graph.project(
+      'xfer',
+      s,
+      r,
+      { relationshipProperties: { weight: tr.amount } }
+    ) AS g;
+    """
+
+    with driver.session() as _s:
+        _o = _s.run(_q).data()
+    _o
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Projection is correct — 100 nodes, 1000 relationships, matching the full transfer set. The graph xfer is now in memory and ready.
+
+    One row, size 100 → single giant component, no isolated rings. Given this near-uniform network; it rules out the "island of accounts only transacting among themselves" fraud pattern.
+
+    Multiple rows, especially small ones (size 2–6) → those small components are immediately interesting — a handful of accounts cut off from the main flow is exactly the structure cycle/mule analysis looks for. Flag any of those for follow-up.
+    """)
+    return
+
+
+@app.cell
+def _(driver):
+    # Weakly Connected Components
+
+    _q = """
+    CALL gds.wcc.stream('xfer') YIELD nodeId, componentId
+    RETURN componentId, count(*) AS size,
+           collect(gds.util.asNode(nodeId).accountNumber)[..10] AS sample
+    ORDER BY size ASC;
+    """
+
+    with driver.session() as _s:
+        _o = _s.run(_q).data()
+    _o
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    One component, all 100 accounts — no isolated sub-networks. Every account is reachable from every other through transfer flow. This rules out the cleanest fraud pattern (a ring of accounts transacting only among themselves) and confirms the near-uniform structure
+    """)
+    return
+
+
+@app.cell
+def _(driver):
+    # Louvain to look for tight sub-communities within whatever WCC returns — that's where the weak-vs-real structure signal shows up via the modularity score.
+
+    _q = """
+    CALL gds.louvain.stream('xfer', { relationshipWeightProperty: 'weight' })
+    YIELD nodeId, communityId
+    RETURN communityId, count(*) AS members,
+           collect(gds.util.asNode(nodeId).accountNumber)[..10] AS sample
+    ORDER BY members DESC;
+    """
+
+    with driver.session() as _s:
+        _o = _s.run(_q).data()
+    _o
+    return
+
+
+@app.cell
+def _(driver):
+    # Compute modularity score
+
+    _q = """
+    CALL gds.louvain.stats('xfer', { relationshipWeightProperty: 'weight' })
+    YIELD communityCount, modularity, modularities
+    RETURN communityCount, modularity;
+    """
+
+    with driver.session() as _s:
+        _o = _s.run(_q).data()
+    _o
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Modularity ≲ 0.3 → communities are weak/arbitrary; the partition is essentially noise. So no meaningful community structure in the transfer graph at this snapshot.
+
+    Modularity ≳ 0.4–0.5 with a few mid-sized communities → genuine clustering worth pursuing into cross-referencing community membership against shared customer attributes like country/address.
+
+    So the transfer network shows no community structure (modularity 0.15) or isolated components; recommend to include transaction-level monitoring on top of over network analysis for this dataset.
+
+    Benefits of GDS
+    - built in datascience network algorithms: exactly where the data sits for lower latency, higher performance.
+    """)
+    return
+
+
+@app.cell
+def _(driver):
+    # just to show cross-referencing community membership with shared 'country' and 'address' attribute
+
+    _q = """
+    CALL gds.louvain.stream('xfer') YIELD nodeId, communityId
+    WITH communityId, gds.util.asNode(nodeId) AS acct
+    MATCH (cust:Customer)-[:HAS_ACCOUNT]->(acct)
+    RETURN communityId, count(*) AS members,
+           collect(DISTINCT cust.country) AS countries,
+           collect(DISTINCT cust.address)[..5] AS addresses
+    ORDER BY members DESC;
+    """
+
+    with driver.session() as _s:
+        _o = _s.run(_q).data()
+    _o
+    return
+
+
+@app.cell
+def _(driver):
+    # cleanup
+    with driver.session() as _s:
+        _o = _s.run("CALL gds.graph.drop('xfer');").data()
+    _o
     return
 
 

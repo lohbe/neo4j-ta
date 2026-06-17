@@ -31,6 +31,13 @@ def _():
 
 @app.cell
 def _(mo):
+    callout = mo.callout("DANGER: This script wipes the ENTIRE default neo4j database at localhost", kind="danger")
+    mo.vstack([callout], align="stretch", gap=0)
+    return
+
+
+@app.cell
+def _(mo):
     mo.outline(label="Table of Contents")
     return
 
@@ -82,7 +89,7 @@ def _(mo):
 
     `customers.csv` contains details about banking customers. There are 100 customers (unique rows), and can be represented as nodes/vertices in neo4j. The uniqueness of identity would make it challenging to identify classic fraud signals like mule networks, so extra steps like watching behaviour over time would be required. But the availability of demographic data would be useful for merchant analytics, like age and occupation.
 
-    `purchases.csv` contains details of 10,000 transcations with a set of 30 merchants made through the customers' card. Transactions here imply flow of credit from customer to merchant - this can be represented as directed edges/relationships in neo4j. To find out who made the purchase, `CardNumber` needs to be joined with the `customer` table.
+    `purchases.csv` contains details of 10,000 transactions with a set of 30 merchants made through the customers' card. Transactions here imply flow of credit from customer to merchant - this can be represented as directed edges/relationships in neo4j. To find out who made the purchase, `CardNumber` needs to be joined with the `customer` table.
     There are 42 duplicate `TranscationID`s - this is generally considered a **red flag** for potential replay attacks, exploits or account takeovers - or some accidental system issue (double clicking, etc). This is worth checking out.
 
     `transfers` contains details of 1,000 credit transfers between customer accounts. This can be represented as a sending-to or receive-from relationship/edge in neo4j. Similarly, there is one non-unique `TransactionID` worth checking out, from the summary statistics. This is also worth checking out.
@@ -107,6 +114,14 @@ def _(purchases):
     duplicate_purchases = duplicate_purchases.sort_values(by='TransactionID')
 
     duplicate_purchases # ignore the unnamed column - a marimo artifact.
+    return
+
+
+@app.cell
+def _(transfers):
+    # same for duplicate transfers
+    duplicate_transfers = transfers[transfers.duplicated(subset=['TransactionID'], keep=False)]
+    duplicate_transfers
     return
 
 
@@ -160,7 +175,7 @@ def _(mo):
     The identified use cases are:
 
     1. Fraud
-    2. Mechant analytics
+    2. Merchant analytics
 
     Questions for Fraud
 
@@ -169,12 +184,18 @@ def _(mo):
     3. Why is there a non-unique TransactionID in `transfers`?
     4. Which customers' transfers are associated with duplicate transactionIDs?
 
-    Questions for Mechant analytics
+    Questions for Merchant analytics
 
-    1. Who are the youngest customers
-    2. Oldest customers?
-    3. Which age group spends the most?
-    4. Occupation?
+    1. Which occupation dominates per merchant?
+    2. What is the median age per merchant?
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Load Data
     """)
     return
 
@@ -187,10 +208,8 @@ def _(GraphDatabase):
     driver.verify_connectivity()
 
     # clean slate
-    _reset = "MATCH (n) DETACH DELETE n"
-
     with driver.session() as _s:
-        _s.run(_reset)
+        _s.run("MATCH (n) DETACH DELETE n")
     return (driver,)
 
 
@@ -343,9 +362,17 @@ def _(driver, pd):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Of the 42 duplicates, only transcation ID 401743 is confined to a single card/customer - a collision worth inspecting.
+    """)
+    return
+
+
 @app.cell
 def _(driver, pd):
-    # zoom in to cif = 5 on the duplicate transaction. look at his 'web'
+    # zoom in to cif = 5 on the duplicate transaction.
 
     _q = """
     MATCH (c:Customer {cif: "5"})-[:HAS_CARD]->(a:Card)-[:FUNDS]->(p:Purchase {transactionId: "401743"})-[:PAID_TO]->(m:Merchant)
@@ -359,6 +386,14 @@ def _(driver, pd):
     _result['p.purchaseDatetime'] = pd.to_datetime(_result['p.purchaseDatetime'].apply(lambda x: x.iso_format() if pd.notnull(x) else None))
 
     _result
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Both are in near-equal amounts. Given two different merchants → does not appear to be a clean replay of transaction.
+    """)
     return
 
 
@@ -388,12 +423,41 @@ def _(mo):
     All his transactions are spread rather uniformly in the snapshot.
     All his transactions are made to the 30 unique merchants in the dataset (possibly synthetic).
 
+    Conclusion: duplicates are ID collisions across distinct customers, not replay/takeover.
+
     Benefits of graph database:
-    - I access customer, purchase, merchant, card details in one efficient, logical query (multiple joins would be required in RDBMS)
+    - Accessing customer, purchase, merchant, card details in one efficient, logical query (multiple joins would be required in RDBMS)
 
     Possible next steps:
     - Find out with bank, the reasons behind multiple card issuer for each card.
+    - Check with bank for transfer transaction race-conditions (see below cell)
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    How about the duplicate transfer? It appears a genuine encoding issue with transaction id, because the transfers occured to 4 separate customers with differing amounts.
+    """)
+    return
+
+
+@app.cell
+def _(driver, pd):
+    # note undirected relationship
+
+    _q = """
+    MATCH (c:Customer)-[:HAS_ACCOUNT]->(a:Account)-[:SENT_TO | RECEIVED_BY]-(t:Transfer {transactionId: "835422"})
+    RETURN t.transactionId, c.cif, c.lastName, c.firstName, t.amount, t.transferDatetime;
+    """
+
+    with driver.session() as _s:
+        _o = _s.run(_q).data()
+
+    _result = pd.DataFrame(_o)
+    _result['t.transferDatetime'] = pd.to_datetime(_result['t.transferDatetime'].apply(lambda x: x.iso_format() if pd.notnull(x) else None))
+    _result
     return
 
 
@@ -599,11 +663,9 @@ def _(driver):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Modularity ≲ 0.3 → communities are weak/arbitrary; the partition is essentially noise. So no meaningful community structure in the transfer graph at this snapshot.
+    Modularity 0.15 ≲ 0.3 → communities are weak/arbitrary; the partition is essentially noise. So no meaningful community structure in the transfer graph at this snapshot.
 
-    Modularity ≳ 0.4–0.5 with a few mid-sized communities → genuine clustering worth pursuing into cross-referencing community membership against shared customer attributes like country/address.
-
-    So the transfer network shows no community structure (modularity 0.15) or isolated components; recommend to include transaction-level monitoring on top of over network analysis for this dataset.
+    So the transfer network shows no community structure or isolated components; recommend to include transaction-level monitoring on top of network analysis for this dataset.
 
     Benefits of GDS
     - built in datascience network algorithms: exactly where the data sits for lower latency, higher performance.
@@ -613,7 +675,8 @@ def _(mo):
 
 @app.cell
 def _(driver):
-    # just to show cross-referencing community membership with shared 'country' and 'address' attribute
+    # if Modularity ≳ 0.4–0.5 with a few mid-sized communities → genuine clustering worth pursuing into cross-referencing community membership against shared customer attributes like country/address.
+    # below just to show cross-referencing community membership with shared 'country' and 'address' attribute
 
     _q = """
     CALL gds.louvain.stream('xfer') YIELD nodeId, communityId

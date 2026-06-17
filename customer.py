@@ -1,8 +1,11 @@
 # /// script
 # dependencies = [
+#     "altair==6.2.1",
 #     "marimo",
 #     "neo4j==6.2.0",
 #     "pandas==3.0.3",
+#     "py==1.11.0",
+#     "pyarrow==24.0.0",
 # ]
 # requires-python = ">=3.14"
 # ///
@@ -20,7 +23,10 @@ def _():
 
     from neo4j import GraphDatabase
 
-    return GraphDatabase, mo, pd
+    import altair as alt
+    import py
+
+    return GraphDatabase, alt, mo, pd
 
 
 @app.cell
@@ -77,7 +83,7 @@ def _(mo):
     `customers.csv` contains details about banking customers. There are 100 customers (unique rows), and can be represented as nodes/vertices in neo4j. The uniqueness of identity would make it challenging to identify classic fraud signals like mule networks, so extra steps like watching behaviour over time would be required. But the availability of demographic data would be useful for merchant analytics, like age and occupation.
 
     `purchases.csv` contains details of 10,000 transcations with a set of 30 merchants made through the customers' card. Transactions here imply flow of credit from customer to merchant - this can be represented as directed edges/relationships in neo4j. To find out who made the purchase, `CardNumber` needs to be joined with the `customer` table.
-    There are 42 duplicate `TranscationID`s - this is a **red flag** for potential replay attacks, exploits or account takeovers - or some accidental system issue (double clicking, etc). This is worth checking out.
+    There are 42 duplicate `TranscationID`s - this is generally considered a **red flag** for potential replay attacks, exploits or account takeovers - or some accidental system issue (double clicking, etc). This is worth checking out.
 
     `transfers` contains details of 1,000 credit transfers between customer accounts. This can be represented as a sending-to or receive-from relationship/edge in neo4j. Similarly, there is one non-unique `TransactionID` worth checking out, from the summary statistics. This is also worth checking out.
 
@@ -87,7 +93,7 @@ def _(mo):
 
     In graph databases, it is trivial for properties (e.g. `country`) of a node to be 'promoted' into nodes, creating a data 'web' especially for categories that matter to the analysis. So instead of scanning every customer for `country`, the `country` node can be a hub with `customer`s pointing to it.
 
-    Based on the initial investigation, use cases like fraud detection can be possible next steps.
+    Based on the initial investigation, use cases like fraud detection or merchant analytics can be possible next steps.
     """)
     return
 
@@ -175,8 +181,16 @@ def _(mo):
 
 @app.cell
 def _(GraphDatabase):
+    # using CE, cannot CREATE
+
     driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
     driver.verify_connectivity()
+
+    # clean slate
+    _reset = "MATCH (n) DETACH DELETE n"
+
+    with driver.session() as _s:
+        _s.run(_reset)
     return (driver,)
 
 
@@ -294,9 +308,195 @@ def _(driver):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Cypher Query Development
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Fraud study
+    """)
+    return
+
+
 @app.cell
-def _(driver):
-    driver.session().close()
+def _(driver, pd):
+    _q = """
+    MATCH (cust:Customer)-[:HAS_CARD]->(card:Card)-[:FUNDS]->(p:Purchase)-[:PAID_TO]->(m:Merchant)
+    WITH p.transactionId AS txid, collect(DISTINCT cust.cif) AS customers, count(*) AS n
+    WHERE n > 1
+    // duplicate IDs that span more than one real customer = collision, not a single fraud actor
+    RETURN txid, n, customers, size(customers) AS distinctCustomers
+    ORDER BY distinctCustomers
+    """
+
+    with driver.session() as _s:
+        _o = _s.run(_q).data()
+
+    _result = pd.DataFrame(_o)
+    _result
+    return
+
+
+@app.cell
+def _(driver, pd):
+    # zoom in to cif = 5 on the duplicate transaction. look at his 'web'
+
+    _q = """
+    MATCH (c:Customer {cif: "5"})-[:HAS_CARD]->(a:Card)-[:FUNDS]->(p:Purchase {transactionId: "401743"})-[:PAID_TO]->(m:Merchant)
+    RETURN p.transactionId, c.firstName, c.lastName, m.name, p.amount, p.purchaseDatetime, a.cardNumber, p.cardIssuer;
+    """
+
+    with driver.session() as _s:
+        _o = _s.run(_q).data()
+
+    _result = pd.DataFrame(_o)
+    _result['p.purchaseDatetime'] = pd.to_datetime(_result['p.purchaseDatetime'].apply(lambda x: x.iso_format() if pd.notnull(x) else None))
+
+    _result
+    return
+
+
+@app.cell
+def _(driver, pd):
+    # could cif = 5 be a POI? let's see his transcation history
+
+    _q = """
+    MATCH (c:Customer {cif: "5"})-[:HAS_CARD]->(a:Card)-[:FUNDS]->(p:Purchase)-[:PAID_TO]->(m:Merchant)
+    RETURN c.cif, p.transactionId, m.name, p.amount, p.purchaseDatetime, a.cardNumber, p.cardIssuer;
+    """
+
+    with driver.session() as _s:
+        _o = _s.run(_q).data()
+
+    _result = pd.DataFrame(_o)
+    _result['p.purchaseDatetime'] = pd.to_datetime(_result['p.purchaseDatetime'].apply(lambda x: x.iso_format() if pd.notnull(x) else None))
+    _result
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    There are 178 transactions for customer 5, 'Erick Ingram'.
+    He makes considerable high value transactions (similar to the rest of the customers).
+    All his transactions are spread rather uniformly in the snapshot.
+    All his transactions are made to the 30 unique merchants in the dataset (possibly synthetic).
+
+    Benefits of graph database:
+    - I access customer, purchase, merchant, card details in one efficient, logical query (multiple joins would be required in RDBMS)
+
+    Possible next steps:
+    - Find out with bank, the reasons behind multiple card issuer for each card.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Merchant analytics
+    """)
+    return
+
+
+@app.cell
+def _(alt, driver, mo, pd):
+    # Which occupation dominates each merchant's customer base?
+
+    _q = """
+    MATCH (cust:Customer)-[:HAS_CARD]->(:Card)-[:FUNDS]->(p:Purchase)-[:PAID_TO]->(m:Merchant)
+    WITH m, cust.jobTitle AS job, count(*) AS n
+    ORDER BY n DESC
+    WITH m, collect({job: job, n: n})[0] AS top, sum(n) AS total
+    RETURN m.name AS merchant, top.job AS dominantOccupation,
+           round(100.0 * top.n / total) AS sharePct
+    ORDER BY sharePct DESC
+    """
+
+    with driver.session() as _s:
+        _o = _s.run(_q).data()
+    _result = pd.DataFrame(_o)
+
+    _chart = (
+        alt.Chart(_result)
+        .mark_bar()
+        .encode(
+            x=alt.X("sharePct:Q",
+                    title="Top occupation's share of the merchant's customers (%)"),
+            y=alt.Y("merchant:N", sort="-x", title="Merchant"),
+            color=alt.Color("dominantOccupation:N", title="Dominant occupation"),
+            tooltip=["merchant", "dominantOccupation", "sharePct"],
+        )
+        .properties(height=520, title="Most common occupation per merchant (note: shares are low)")
+    )
+    mo.ui.altair_chart(_chart)
+    return
+
+
+@app.cell
+def _(alt, driver, mo, pd):
+    # Age skew: which merchants serve the youngest vs oldest customers?
+
+    _q = """
+    MATCH (cust:Customer)-[:HAS_CARD]->(:Card)-[:FUNDS]->(p:Purchase)-[:PAID_TO]->(m:Merchant)
+    RETURN m.name AS merchant,
+           round(percentileCont(cust.age, 0.5)) AS medianAge,
+           count(p) AS txns
+    ORDER BY medianAge
+    """
+    with driver.session() as _s:
+        _o = _s.run(_q).data()
+
+    _age = pd.DataFrame(_o)
+
+    _chart = (
+        alt.Chart(_age)
+        .mark_circle(size=110, opacity=0.85)
+        .encode(
+            x=alt.X("medianAge:Q",
+                    title="Median customer age",
+                    scale=alt.Scale(zero=False, nice=False,
+                                    domain=[_age.medianAge.min() - 1,
+                                            _age.medianAge.max() + 1])),
+            y=alt.Y("merchant:N", sort="-x", title="Merchant"),
+            tooltip=["merchant", "medianAge", "txns"],
+        )
+        .properties(height=520,
+                    title="Median customer age per merchant (zoomed axis — spread is only ~2 yrs)")
+    )
+    mo.ui.altair_chart(_chart)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The results appear to be a result of synthetic data generation.
+    - Age spread of customers per unique merchant is 2 years
+    - The merchant shares per occupation is roughly equal
+
+    The benefit of cypher
+    - Analytics and summary statistics in a single query spanning multiple entities and relations
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Graph Data Science
+    """)
+    return
+
+
+@app.cell
+def _():
     return
 
 

@@ -1,0 +1,110 @@
+/* Neo4j-flavoured overrides on top of the reveal "black" theme */
+:root {
+  --neo-blue: #018bff;
+  --neo-teal: #00b3a4;
+  --neo-green: #4caf50;
+  --neo-amber: #ffb84d;
+  --neo-pink: #ff6f91;
+  --neo-bg: #14181f;
+  --neo-panel: #1d232d;
+}
+
+.reveal {
+  font-family: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 30px;
+}
+
+.reveal .slides {
+  text-align: left;
+}
+
+.reveal h1,
+.reveal h2,
+.reveal h3,
+.reveal h4 {
+  font-family: "Inter", "Helvetica Neue", sans-serif;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.reveal h1 { color: #fff; font-size: 2.1em; }
+.reveal h2 { color: var(--neo-blue); font-size: 1.5em; }
+.reveal h3 { color: var(--neo-teal); font-size: 1.1em; }
+
+.reveal section { background: transparent; }
+
+/* The Reveal background is set globally below */
+.reveal .backgrounds { background: var(--neo-bg); }
+
+.reveal a { color: var(--neo-teal); }
+
+.reveal strong { color: var(--neo-amber); font-weight: 600; }
+
+.reveal ul,
+.reveal ol { display: block; margin-left: 1em; }
+
+.reveal li { margin: 0.25em 0; line-height: 1.3; }
+
+.reveal li::marker { color: var(--neo-blue); }
+
+/* Code blocks */
+.reveal pre {
+  width: 100%;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  font-size: 0.6em;
+  border-radius: 8px;
+}
+.reveal pre code {
+  border-radius: 8px;
+  padding: 14px 18px;
+  max-height: 460px;
+}
+.reveal code { font-family: "JetBrains Mono", "Fira Code", monospace; }
+.reveal :not(pre) > code {
+  color: var(--neo-amber);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* Tables */
+.reveal table { font-size: 0.7em; margin: 0.5em 0; }
+.reveal table th { color: var(--neo-blue); border-bottom: 2px solid var(--neo-blue); }
+.reveal table td { border-bottom: 1px solid rgba(255, 255, 255, 0.12); }
+
+/* Two-column helper: write inside a fenced block with class .cols in HTML */
+.cols { display: flex; gap: 1.2em; align-items: flex-start; }
+.cols > * { flex: 1; }
+
+/* Coloured "pill" callouts used inline in Markdown via raw HTML */
+.pill {
+  display: inline-block;
+  padding: 2px 12px;
+  border-radius: 999px;
+  font-size: 0.72em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.pill.ee { background: rgba(1, 139, 255, 0.18); color: var(--neo-blue); border: 1px solid var(--neo-blue); }
+.pill.ce { background: rgba(76, 175, 80, 0.16); color: var(--neo-green); border: 1px solid var(--neo-green); }
+.pill.aura { background: rgba(255, 111, 145, 0.16); color: var(--neo-pink); border: 1px solid var(--neo-pink); }
+
+.note {
+  border-left: 4px solid var(--neo-amber);
+  background: rgba(255, 184, 77, 0.08);
+  padding: 0.5em 1em;
+  border-radius: 4px;
+  font-size: 0.82em;
+}
+
+/* Section divider slides */
+.reveal section.divider h2 { color: #fff; font-size: 2.4em; }
+.reveal section.divider { text-align: center; }
+
+.reveal .small { font-size: 0.7em; opacity: 0.8; }
+.reveal .footer { position: absolute; bottom: 8px; left: 16px; font-size: 0.45em; opacity: 0.5; }
+
+/* Progress + controls in Neo4j blue */
+.reveal .progress { color: var(--neo-blue); height: 4px; }
+.reveal .controls { color: var(--neo-blue); }

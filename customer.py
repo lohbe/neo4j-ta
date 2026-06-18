@@ -13,7 +13,11 @@
 import marimo
 
 __generated_with = "0.23.9"
-app = marimo.App(width="medium", auto_download=["html"])
+app = marimo.App(
+    width="medium",
+    layout_file="layouts/customer.slides.json",
+    auto_download=["html"],
+)
 
 
 @app.cell
@@ -24,7 +28,6 @@ def _():
     from neo4j import GraphDatabase
 
     import altair as alt
-    import py
 
     return GraphDatabase, alt, mo, pd
 

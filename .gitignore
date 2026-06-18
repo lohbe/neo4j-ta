@@ -33,3 +33,6 @@ __marimo__/
 
 # Just
 .justfile.swp
+
+# Claude
+.claude/

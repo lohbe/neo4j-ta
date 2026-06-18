@@ -1,6 +1,12 @@
 set default-list := true
 
-[working-directory: '/opt/homebrew/var/neo4j/data'] 
+# Serve the reveal.js decks with live reload on save
+# Technical Advisory: http://localhost:4321/   Business & Strategy: http://localhost:4321/business.html
+[working-directory: 'deck']
+deck:
+  npx --yes live-server --port=4321 --watch=slides.md,business.md,theme.css,index.html,business.html .
+
+[working-directory: '/opt/homebrew/var/neo4j/data']
 reset:
   neo4j stop
   rm -rf databases/neo4j

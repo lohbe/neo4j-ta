@@ -2,10 +2,10 @@
   "name": "neo4j-ta-deck",
   "version": "1.0.0",
   "private": true,
-  "description": "Neo4j Technical Advisory — reveal.js deck with live edit/preview loop",
+  "description": "Neo4j SE deck — reveal.js deck with live edit/preview loop",
   "scripts": {
-    "start": "live-server --port=4321 --no-browser --watch=slides.md,business.md,theme.css,index.html,business.html .",
-    "dev": "live-server --port=4321 --watch=slides.md,business.md,theme.css,index.html,business.html .",
+    "start": "live-server --port=4321 --no-browser --watch=business.md,theme.css,index.html .",
+    "dev": "live-server --port=4321 --watch=business.md,theme.css,index.html .",
     "serve": "live-server --port=4321 --no-browser ."
   },
   "devDependencies": {

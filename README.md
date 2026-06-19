@@ -9,7 +9,7 @@ It pairs a live, runnable [Marimo](https://marimo.io) notebook with a banking cu
 | Path | What it is |
 |------|------------|
 | [`customer.py`](customer.py) | Marimo notebook — the live demo: graph modeling, ingestion, Cypher fraud queries, merchant analytics, and GDS community detection. |
-| [`deck/`](deck/) | reveal.js deck for banking customer. See [`deck/README.md`](deck/README.md). |
+| [`deck/`](deck/) | reveal.js SE deck for banking customer. See [`deck/README.md`](deck/README.md). |
 | [`deck/preso.pdf`](deck/preso.pdf) | Pre-exported PDF of the deck, for quick viewing without a server. |
 | [`customers.csv`](customers.csv), [`purchases.csv`](purchases.csv), [`transfers.csv`](transfers.csv) | The synthetic dataset loaded by the notebook. |
 | [`justfile`](justfile) | Helper recipes (`just deck`, `just reset`, `just install-gds`). |
@@ -63,7 +63,7 @@ needed. Step through the cells to run the demo.
 
 | Recipe | What it does |
 |--------|--------------|
-| `just deck` | Serve both reveal.js decks with live reload (Technical Advisory at <http://localhost:4321/>, Business & Strategy at <http://localhost:4321/business.html>). |
+| `just deck` | Serve the reveal.js SE deck with live reload (<http://localhost:4321/>). |
 | `just reset` | Stop Neo4j, wipe the default database files, restart — a clean slate between demo runs. *(Homebrew paths; adjust if your install differs.)* |
 | `just install-gds` | Download and install the GDS plugin into a Homebrew Neo4j install, and print the `neo4j.conf` settings to enable it. |
 
@@ -71,13 +71,11 @@ needed. Step through the cells to run the demo.
 > Neo4j version. Open [`justfile`](justfile) and adjust them to match your
 > install before running.
 
-## The slide decks
+## The SE deck
 
-The deck lives under [`deck/`](deck/), one theme and a live-preview harness. For a quick read with no setup, open [`deck/preso.pdf`](deck/preso.pdf).
+The deck lives under [`deck/`](deck/), with one theme and a live-preview harness. For a quick read with no setup, open [`deck/preso.pdf`](deck/preso.pdf).
 
 ## Notes
 
-- Built and tested against a Homebrew Neo4j install 2026.05.0 (the `justfile` reflects
-  that). Other installs work — just update the paths in the recipes.
-- The ingestion is written for **Community Edition** (no `CREATE DATABASE`); it
-  works against the default database rather than creating a dedicated one.
+- Built and tested against a Homebrew Neo4j install 2026.05.0 (the `justfile` reflects that). Other installs work — just update the paths in the recipes.
+- The ingestion is written for **Community Edition** (no `CREATE DATABASE`); it works against the default database rather than creating a dedicated one.

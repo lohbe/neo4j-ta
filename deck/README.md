@@ -1,28 +1,24 @@
-# Neo4j — reveal.js decks
+# Neo4j — SE deck
 
-Two self-contained [reveal.js](https://revealjs.com) decks on Neo4j, tailored to
-the banking fraud-detection graph in this repo. Both share one theme and one
-live-preview harness.
+A self-contained [reveal.js](https://revealjs.com) SE deck on Neo4j, tailored to
+the banking fraud-detection graph in this repo.
 
 | Deck | Open at | Source |
 |------|---------|--------|
-| **Technical Advisory** — infra, data mgmt, tuning, licensing, competition | <http://localhost:4321/> | `slides.md` |
-| **Business & Strategy** — what/why/when/how, value & impact | <http://localhost:4321/business.html> | `business.md` |
+| **SE deck** — what/why/when/how, value & impact | <http://localhost:4321/> | `business.md` |
 
 ```
 deck/
-├── index.html     # Technical Advisory bootstrap (CDN, no build step)
-├── business.html  # Business & Strategy bootstrap
-├── slides.md      # ← TA content. All content lives here, in Markdown.
-├── business.md    # ← Business & Strategy content, in Markdown.
-├── theme.css      # Neo4j-flavoured visual overrides (shared)
+├── index.html     # SE deck bootstrap (CDN, no build step)
+├── business.md    # ← SE deck content. All content lives here, in Markdown.
+├── theme.css      # Neo4j-flavoured visual overrides
 ├── package.json   # live-preview harness (live-server)
 └── README.md
 ```
 
 ## Live edit / preview loop
 
-The deck loads `slides.md` at runtime via `fetch`, so it must be served over
+The deck loads `business.md` at runtime via `fetch`, so it must be served over
 HTTP (opening `index.html` as a `file://` URL will show a blank deck). Any static
 server with live-reload works. Two options:
 
@@ -34,21 +30,21 @@ npm install      # one time
 npm start        # serves http://localhost:4321 and reloads on save
 ```
 
-Edit `slides.md` (or `theme.css`), hit save, and the browser refreshes
+Edit `business.md` (or `theme.css`), hit save, and the browser refreshes
 automatically. This is the intended authoring loop.
 
 ### Option B — zero install
 
 ```bash
 cd deck
-npx live-server --port=4321 --watch=slides.md,theme.css .
+npx live-server --port=4321 --watch=business.md,theme.css .
 # or, no live-reload:
 python3 -m http.server 4321
 ```
 
 Then open <http://localhost:4321>.
 
-## Authoring `slides.md`
+## Authoring `business.md`
 
 - `===` on its own line starts a **new horizontal slide**.
 - `--` on its own line starts a **vertical (sub) slide**.

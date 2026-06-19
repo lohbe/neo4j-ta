@@ -268,7 +268,6 @@ Note:
 
 ===
 
-<!-- .slide: class="divider" -->
 ## Impact
 
 - **Revenue & loss avoidance** — detect fraud rings and risk earlier; better recommendations lift conversion.

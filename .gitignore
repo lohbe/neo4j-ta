@@ -26,7 +26,10 @@ Thumbs.db
 
 # Jupyter / Marimo
 .ipynb_checkpoints/
-__marimo__/
+__marimo__/*
+
+# except html previews
+!__marimo__/*.html
 
 # Data files (large/generated)
 *.csv.zip

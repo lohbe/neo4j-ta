@@ -668,7 +668,8 @@ def _(mo):
     So the transfer network shows no community structure or isolated components; recommend to include transaction-level monitoring on top of network analysis for this dataset.
 
     Benefits of GDS
-    - built in datascience network algorithms: exactly where the data sits for lower latency, higher performance.
+    - datascience network algorithms: apply mathematically rigourous methods exclusive to graph-organised data for insights
+    - built in : exactly where the data sits for lower latency, higher performance.
     """)
     return
 

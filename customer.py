@@ -160,7 +160,7 @@ def _(mo):
 
     ### Model Constraints
 
-    Neo4j only supports four constraint kinds: uniqueness, node-key, existence, and type. Constraints automatically create backing indexes that help speed up MATCH operations.
+    Neo4j only supports four constraint kinds: uniqueness, existence, node/edge key (combo of uniqueness and existence) and type. Constraints automatically create backing indexes that help speed up MATCH operations.
 
     Customer.CIF, Card.CardNumber, Account.AccountNumber are unique
     Merchant names are unique (assumed)
@@ -320,9 +320,9 @@ def _(driver):
     # Verify
 
     with driver.session() as _s:
-            counts = _s.run("""
-                MATCH (n) RETURN labels(n)[0] AS label, count(*) AS n ORDER BY label
-            """).data()
+        counts = _s.run("""
+            MATCH (n) RETURN labels(n)[0] AS label, count(*) AS n ORDER BY label
+        """).data()
     counts
     return
 

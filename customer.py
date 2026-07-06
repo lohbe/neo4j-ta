@@ -12,12 +12,8 @@
 
 import marimo
 
-__generated_with = "0.23.9"
-app = marimo.App(
-    width="medium",
-    layout_file="layouts/customer.slides.json",
-    auto_download=["html"],
-)
+__generated_with = "0.23.13"
+app = marimo.App(width="medium", auto_download=["html"])
 
 
 @app.cell
@@ -219,6 +215,7 @@ def _(GraphDatabase):
 @app.cell
 def _(driver):
     # Create constraints
+    # Transaction IDs are supposed to be constraints, but for this analysis, we need to load them as dupes
 
     constraints = [
         "CREATE CONSTRAINT customer_cif IF NOT EXISTS FOR (c:Customer) REQUIRE c.cif IS UNIQUE",

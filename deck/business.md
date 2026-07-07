@@ -7,77 +7,84 @@ With a live demo
 <span class="small">Press <strong>S</strong> for speaker notes · <strong>Esc</strong> for overview · <strong>F</strong> for fullscreen</span>
 
 Note:
-This is the executive / decision-maker narrative. Goal: leave the room able to answer "what is it, why is it different, when does it pay off, and how do we start." We end on business value, not technology.
+This deck is a 2-D grid: each **horizontal** step is a topic (press → ), each **vertical** step goes one level deeper on that topic (press ↓). Use the overview (Esc) to see the whole grid at a glance.
 
 ===
 
 ## Agenda
 
-1. **Introduction** — what is Neo4j?
-2. **How is it different?** 
-3. **How is it better?**
-4. **When is it better?**
-5. **How do we get onboard?**
-6. **Demo** — fraud, from questions to answers
-7. **Conclusion** 
+1. **Where we are now** — the industry reality
+2. **Pain of the status quo** — where traditional databases do not keep up
+3. **Paradigm shift** — from tables to graphs
+4. **Solution architecture** — how Neo4j is built
+5. **Demo** — fraud, from questions to answers
+6. **Customer success** — proof in production
+7. **Call to action** — next steps
 
 ===
 
 <!-- .slide: class="divider" -->
-## Intro to Neo4j
+## 1 · Where we are now
+### The industry reality
+
+--
+
+## The world got faster (so did the fraud)
+
+- **Digital transactions and instant payments** have exploded in volume.
+- **Financial crime has grown in tandem** — greater volume, greater complexity, more sophisticated.
+- Fraud rarely acts alone: it **hides inside highly connected networks** — shared devices, mule accounts, synthetic identities, collusion rings.
+
+> Money can move instantly now, fraud detection that runs overnight is already too slow.
+
+Note:
+
 
 ===
 
-## What is Neo4j?
+<!-- .slide: class="divider" -->
+## 2 · Pain of the Status Quo
 
-- The world's **most widely adopted graph database** (ranked no.1 db-engines/graphdb)
-- Data stored as **nodes** and the **relationships** between them, not implied/computed like the relational mdoel .
-- Relationships are **first-class citizens**: stored, named, directed, and able to carry their own data.
-- You query the *connections* directly with **Cypher** — a visual, pattern-based query language similar to SQL.
+--
+
+## Where traditional databases do not keep up
+- Traditional Relational Databases (RDBMS) are built to tabulate data, not connect it.
+- A 5/6-hop SQL JOIN query for tracing a money laundering network takes hours, resources and hard to write.
+- Not tackling this has real cost: **compliance exposure**, **delayed transaction blocks**, and slower response to active incidents.
+
+
+Note:
+
+===
+
+<!-- .slide: class="divider" -->
+## 3 · The Paradigm Shift
+
+--
+
+## From tables to graphs
+
+- Move from **rows and columns** to **Nodes** and **Relationships** — a model built for how things connect, not just what they are.
+- **To catch connected criminals, you need connected data.**
 
 ```cypher
-(Customer)-[:HAS_CARD]->(Card)
-   -[:FUNDS]->(Purchase)
-   -[:PAID_TO]->(Merchant)
+(Customer)-[:HAS_CARD]->(Card)-[:FUNDS]->(Purchase)-[:PAID_TO]->(Merchant)
 ```
 
-**Why it matters to the business**
-- Questions about *how things connect* become **simple and fast**.
-- The model looks like the **whiteboard** the business already draws.
-
-</div>
+Neo4j stores exactly this so there's no need to compute this relation for every query, speeding up traversals.
 
 Note:
-Anchor on the whiteboard idea: when a domain expert sketches the business on a whiteboard, they draw circles and arrows — a graph. Neo4j stores exactly that, so there's no translation loss between how the business thinks and how the data is stored.
 
 ===
 
 <!-- .slide: class="divider" -->
-## How is it different?
+## 4 · Solution Architecture
 
-===
+--
 
-## Graph Databases vs RDBMS 
+## Complex SQL vs. one readable path
 
-| | **Relational (RDBMS)** | **Graph (Neo4j)** |
-|---|---|---|
-| Core unit | Tables & rows | Nodes &amp; relationships/edges |
-| Connections | Foreign keys, resolved at **query time** | Stored **directly**, traversed as pointers |
-| "Who connects to whom?" | **JOINs** across tables | Follow the relationship |
-| Cost of a deeper question | More JOINs, slower | **Flat**, per hop |
-| Schema change | Migrations, `ALTER TABLE` | **Additive**, avoids downtime |
-
-- In an RDBMS, relationships are **inferred** manually by matching keys across tables.
-- In a graph, relationships are **stored once** and simply **followed**, so connected queries stay fast as they get deeper.
-
-Note:
-relational databases store data well but treat relationships as an afterthought computed at query time; graph databases store the relationships themselves. Every JOIN is the database re-discovering a connection it could have just stored.
-
-===
-
-## Four joins vs one readable path
-
-Find merchants paid by specific customer/card
+Find merchants paid by a specific customer's card:
 
 <div class="cols">
 
@@ -85,7 +92,7 @@ Find merchants paid by specific customer/card
 ```sql
 SELECT DISTINCT m.name
 FROM customer c
-JOIN card cd   ON cd.cif = c.cif
+JOIN card cd    ON cd.cif = c.cif
 JOIN purchase p ON p.card_number = cd.card_number
 JOIN merchant m ON m.name = p.merchant
 WHERE c.cif = '5';
@@ -100,129 +107,38 @@ RETURN DISTINCT m.name;
 
 </div>
 
-Recursive queries like "anyone within 4 hops of a flagged account" is just <code> -[:SENT_TO|RECEIVED_BY*1..4]- </code>.
+- In Neo4j, **relationships are first-class citizens** — stored on disk, not recomputed at query time.
+- **Add new node types without downtime** or breaking a rigid schema — the model grows additively as the business changes.
 
-===
-
-<!-- .slide: class="divider" -->
-## How is it better?
-
-===
-
-## Filling a critical business gap
-
-> The value in your data increasingly lives in the **connections**.
-
-- Real business questions are **relationship questions**: *fraud rings, recommendations, dependencies, supply chains, customer 360.*
-- In a relational world those answers are **buried under join complexity** — slow to run and slow to build.
-- Graph makes connected questions **cheap to ask and natural to express**, so the business can finally act on them.
-
-===
-
-## Benefits
-
-**Unlock**
-- See patterns that span **multiple hops**
-- Answers in at the **speed** of thought, not overnight batch
-- Models that **match the business**
-
-**What you gain**
-- Detect **fraud rings**, not just bad transactions
-- Discover **hidden clusters & cycles**
-- Ship new questions **without re-architecting**
-
-</div>
+Recursive questions like "anyone within 4 transfer hops of an account" are just <code>-[:SENT_TO|RECEIVED_BY*1..4]-</code>.
 
 Note:
-it's not that relational is "bad," it's that relationship-centric questions are precisely where it's weakest — and those questions are where competitive advantage increasingly sits. Graph turns "too hard to ask" into "answered in real time."
 
-===
+--
 
-<!-- .slide: class="divider" -->
-## When is it better?
+## Built for traversal
 
-===
-
-## When to use graph databases?
-
-If your hardest questions start with "how is X **connected** to Y **through**…", that's a graph problem.
-
-1. **Primary data is highly networked**
-
-   Entities reference many others (customers ↔ accounts ↔ transfers ↔ merchants).
-
-2. **And networked deeply**
-
-    Queries that span **many hops**, not just one join (rings, paths, reachability).
-
-3. **Large transactional & analytical volumes exacerbate the problem**
-
-    At scale, JOIN-heavy queries slow down; graph traversal cost stays **flat per hop**.
-
-4. **Relationship-gap in columnar data**
-    
-    Warehouses/columnar stores aggregate beautifully but can't *traverse*; graph complements them where connections matter.
+- **Index-free adjacency** — each node holds direct pointers to its neighbours, so traversing a relationship is a pointer-chase, not an index lookup. Query cost stays **flat per hop** instead of compounding.
+- **ACID compliance** — atomicity, consistency, isolation, durability - full transactional integrity even in power failures.
+- **Cypher** — a human-readable, intuitive, pattern-based query language.
 
 Note:
-not a rip-and-replace. Columnar/warehouse is great at "sum by dimension"; graph is great at "trace the path." They coexist — graph fills the relationship gap.
 
-===
+--
 
-## Where it pays off
+## The Neo4j ecosystem
 
-Add graphs where connections drive **value**.
+<img src="https://blogger.googleusercontent.com/img/a/AVvXsEi28v90ykv4h4m7Bm5huHsQVr-L5GxtshsulhVs5YzsApVtdAHgNaefXMpE_Y9Q-gKqLOOFRqfhzOsaxcDVhQEEph5kfHQEXJK5yTXSCkxUA9-IRmRrCbRQlnslEAaxZ8kr8c0TejXLNdRUxB7Hj_vKSlq9QA1Oy3vvHCA3JVJUl0W9MJa3nIm5pdG3=w640-h378" alt="Neo4j ecosystem" style="max-height:440px; border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,0.5);" />
 
-**Strong fit**
-- Fraud & AML — rings, mules, shared identities
-- Recommendations &amp; personalization
-- Knowledge graphs / GraphRAG for AI
-- Network, IT & supply-chain dependencies
-- Identity, entitlements, customer 360
+Neo4j platform: database, data science, visualization and AI/GraphRAG tooling in one.
 
-**Keep relational/columnar for**
-- Simple CRUD on isolated records
-- Heavy tabular aggregation / reporting
-- Flat data with few relationships
+--
 
-===
+## Graph Data Science: topology-aware fraud detection
 
-<!-- .slide: class="divider" -->
-## How do we get onboard?
-
-===
-
-## Getting started
-
-Start with the questions, not the schema. Reuse the data you already have:
-
-1. **Start with the questions** you need to answer — or the places where **join-complexity** is hurting you today.
-2. **Gather the important tables** that those questions touch (customers, cards, purchases, transfers…).
-3. **Observe the columns** — keys become **relationships**, descriptive fields become **properties**.
-4. **Design natively for the questions** — model the graph around how you'll *traverse* it, not around normalization.
-
-```
- Questions  ─▶  Key tables  ─▶  Columns  ─▶  Native graph model
- (or pain)      (the data)      → nodes,        (fits the questions)
-                                  rels, props
-```
-
-Note:
-don't boil the ocean or migrate everything. Pick one painful, high-value question, pull the handful of tables behind it, map columns to a graph, load, and answer it.
-
-===
-
-<!-- .slide: class="divider" -->
-## Demo — Fraud
-
-===
-
-## What the demo showed
-
-The banking fraud model, built the same way we just described:
-
-1. **Domain modeled from the questions** — customers, cards, accounts, purchases, transfers and merchants, loaded directly from existing CSV exports.
-2. **Questions powered the Cypher** — almost intuitively; the query *looks like* the question being asked.
-3. **Graph algorithms run in the DB** — discover **cycles and clusters** that are effectively invisible in columnar/tabular form.
+- Special-purpose **graph algorithms** run directly where the data lives — no export to a separate analytics stack.
+- **Louvain community detection** groups accounts by how tightly they're connected, surfacing collusion rings that per-transaction rules never see.
+- and many other graph algorithms around centrality, community detection, similarity, path finding, etc.
 
 ```cypher
 // Community detection groups colluding accounts into rings
@@ -231,49 +147,68 @@ YIELD nodeId, communityId;
 ```
 
 Note:
-(1) speed-to-model — questions + existing data became a working graph quickly; (2) the algorithm angle — Louvain/centrality/cycle detection surface fraud *rings*, the multi-account structures that per-transaction relational rules never see. That's net-new business capability, not just a faster version of the old query.
 
 --
 
-## Why the "old way" is hard
+## Banking-grade compliance & security
 
-**Relational / columnar**
-- Rules are limited per-transaction: "amount > X"
-- Rings need **recursive self-joins** — slow, brittle, rarely built
-- Clusters live across rows no single query connects
-- Patterns surface **after the fact**, in batch
-
-**Graph (Neo4j)**
-- Traverse the **whole network** of money flow
-- Cycles &amp; communities are **built-in algorithms**
-- Rings surface as **structure**, in real time
-- New fraud patterns = **new query**, not new pipeline
-
-<span class="note">Fraud rings operate as a *network*. Graph lets you investigate them as one.</span>
+- **RBAC and fine-grained access control** — row/property-level permissions for regulated data.
+- **Support for GDPR** and similar regulatory regimes — data residency, right-to-erasure, auditability.
+- **Encryption at rest and in transit**, meeting the same bar as the rest of the banking stack.
+- SOC Type 2: https://neo4j.com/blog/news/neo4j-is-now-soc2-type-ii-compliant/
 
 ===
 
 <!-- .slide: class="divider" -->
-## Conclusion
+## 5 · Demo — Fraud
+
+--
+
+## What we'll walk through
+
+1. **How an analyst investigates and uncovers fraud** — including **ID collisions**.
+2. **Converting tabular data to a graph**.
+3. **Writing a graph query that surfaces a business insight**.
+4. **Running topology-aware Graph Data Science algorithms** to detect fraud rings directly in the database.
+
+Note:
 
 ===
 
-## Business value
+<!-- .slide: class="divider" -->
+## 6 · Customer Success
 
-- **Ask the hard questions** — connected, multi-hop questions become simple and fast.
-- **Fast answers** whereas relational models needs overnight batch — e.g. catching fraud *as it happens*.
-- **Faster delivery** — model matches the business, schema evolves additively.
-- **Higher-value insight** — find **rings, cycles and clusters**, beyond isolated records.
-- **Protects existing investment** — complements your RDBMS/warehouse; adopt incrementally where connections drive value.
+--
+
+## BNP Paribas Personal Finance
+
+Processing **800,000+ credit applications a year**, facing fraud rings that reuse and subtly modify personal details across applications.
+
+**With Neo4j:**
+- **20% reduction in fraud**, while maintaining approval volumes
+- **2-second maximum query latency** for real-time scoring decisions
+- **Millisecond-level comparisons** against historical application data
+
+> "With Neo4j, we have a much better view of each consumer's application. The expansive data context enables us to discern intricate patterns, even uncovering links to known fraudsters."
+
+[neo4j.com/customer-stories/bnp-paribas-personal-finance](https://neo4j.com/customer-stories/bnp-paribas-personal-finance/)
+
+Note:
+This is the same shape of problem as the demo — connected applications, reused identity fragments — but in production, at scale, with numbers attached. It closes the loop from "here's the idea" to "here's the ROI."
 
 ===
 
-## Impact
+<!-- .slide: class="divider" -->
+## 7 · Call to Action
 
-- **Revenue & loss avoidance** — detect fraud rings and risk earlier; better recommendations lift conversion.
-- **Speed to insight** — queries answered in real time, projects delivered in weeks.
-- **Agility** — evolve the model as the business changes.
-- **Competitive edge** — act on the connections in your data before competitors.
+--
 
-### The connections in your data are an asset. Neo4j lets you use them.
+## Next steps
 
+### Graph enablement session for the data engineering team
+
+- Bring your own tables — walk through mapping existing schemas (customers, cards, transfers, merchants) to a native graph model.
+- Hands-on with Cypher and GDS against a working environment.
+- Leave with a scoped, high-value question your team can stand up first.
+
+### The connections in your data are an asset.

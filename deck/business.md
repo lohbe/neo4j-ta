@@ -1,6 +1,6 @@
 <!-- .slide: class="divider" -->
 # Neo4j
-## For fraud use cases in banking
+## For Banking
 
 With a live demo
 
@@ -18,7 +18,7 @@ This deck is a 2-D grid: each **horizontal** step is a topic (press → ), each 
 3. **Paradigm shift** — from tables to graphs
 4. **Solution architecture** — how Neo4j is built
 5. **Demo** — fraud, from questions to answers
-6. **Customer success** — proof in production
+6. **Customer success** — proof of value
 7. **Call to action** — next steps
 
 ===
@@ -156,6 +156,20 @@ Note:
 - **Support for GDPR** and similar regulatory regimes — data residency, right-to-erasure, auditability.
 - **Encryption at rest and in transit**, meeting the same bar as the rest of the banking stack.
 - SOC Type 2: https://neo4j.com/blog/news/neo4j-is-now-soc2-type-ii-compliant/
+
+--
+
+## Other use cases
+
+Neo4j excels at **connected** data - which happens more than one expects:
+
+- employees
+- network and security
+- suppliers
+- process
+- product
+- customers
+- transactions
 
 ===
 

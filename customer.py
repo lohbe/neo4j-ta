@@ -892,7 +892,7 @@ def _(mo):
     ```cypher
     MATCH path = (a:Account)-[:TRANSFERRED*2..6]->(a)
     WHERE all(i IN range(0, size(relationships(path))-2)
-              WHERE relationships(path)[i].transferDatetime <= relationships(path)[i+1].transferDatetime)
+    WHERE relationships(path)[i].transferDatetime <= relationships(path)[i+1].transferDatetime)
     RETURN a, relationships(path)
     ```
     """)

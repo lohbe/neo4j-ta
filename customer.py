@@ -65,11 +65,35 @@ def _(customers):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    This set of data appears to be a snapshot from an analytical database between Jan 1 2021 and Sep 7 2021. When importing the data, some columns were casted into proper types for more accurate analysis.
+
+    `customers.csv` contains details about banking customers. There are 100 customers, each represented by a row. Each customer has one and only one CIF, one credit card and one account number. These are all unique, so classic fraud signals like mule networks would not appear in this dataset.
+
+    `JobTitle` is not completely unique, and might be amenable for merchant analytics.
+    """)
+    return
+
+
 @app.cell
 def _(pd, purchases):
     purchases['TransactionID'] = purchases['TransactionID'].astype(str)
     purchases['PurchaseDatetime'] = pd.to_datetime(purchases['PurchaseDatetime'], format='ISO8601')
     purchases
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    `purchases.csv` contains details of 10,000 transactions with a set of 30 merchants made through the customers' card. Transactions here imply flow of credit from customer to merchant - this can be represented as directed edges/relationships in neo4j.
+
+    In traditional relational databases, to find out who made the purchase, this table with `CardNumber` needs to be joined with another `customer` table. This is an expensive operation, because these tables are extremely large. In graph databases however, JOINs are not necessary because purchases stored as graphs can be quickly matched and traversed.
+
+    There are 42 duplicate `TranscationID`s - this is generally considered a **red flag** for potential replay attacks, exploits or account takeovers - or some unintentional system issue (glitches, double clicking, distributed system coordination, etc). This is worth checking out - so we need to preserve the duplicates while loading data into neo4j.
+    """)
     return
 
 
@@ -84,22 +108,27 @@ def _(pd, transfers):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    This set of data appears to be a snapshot from an analytical database between Jan 1 2021 and Sep 7 2021. When importing the data, some columns were casted into proper types for more accurate analysis.
+    `transfers` contains details of 1,000 credit transfers between customer accounts. This can be represented as a sending-to or receive-from relationship/edge in neo4j.
 
-    `customers.csv` contains details about banking customers. There are 100 customers (unique rows), and can be represented as nodes/vertices in neo4j. The uniqueness of identity would make it challenging to identify classic fraud signals like mule networks, so extra steps like watching behaviour over time would be required. But the availability of demographic data would be useful for merchant analytics, like age and occupation.
+    There is one non-unique `TransactionID` worth checking out. This is also worth checking out, for the same reasons in the `purchases.csv` dataset.
 
-    `purchases.csv` contains details of 10,000 transactions with a set of 30 merchants made through the customers' card. Transactions here imply flow of credit from customer to merchant - this can be represented as directed edges/relationships in neo4j. To find out who made the purchase, `CardNumber` needs to be joined with the `customer` table.
-    There are 42 duplicate `TranscationID`s - this is generally considered a **red flag** for potential replay attacks, exploits or account takeovers - or some accidental system issue (double clicking, etc). This is worth checking out.
-
-    `transfers` contains details of 1,000 credit transfers between customer accounts. This can be represented as a sending-to or receive-from relationship/edge in neo4j. Similarly, there is one non-unique `TransactionID` worth checking out, from the summary statistics. This is also worth checking out.
-
-    To uncover patterns of fraud, it is often beneficial to analyze the relations between entities, compared to looking at columnar or transactional data like the above. This is because the entity-relations are directly represented ('index-free adjacency') as first-class structures in a graph database like neo4j.
+    Analyzing relations between entities is natural in graph databases, compared to looking at columnar or transactional data like the above - this powers its fraud detection capabilities. This is because the entity-relations are directly represented ('index-free adjacency') as first-class structures in a graph database.
 
     Because relations / edges are first class structures, it models a higher level abstraction (network) closer to human activity, compared to columnar data. For example, in analyzing purchases, instead of joining the customer and purchases table, a graph that link customers to merchants (entities) via purchases (edges).
 
-    In graph databases, it is trivial for properties (e.g. `country`) of a node to be 'promoted' into nodes, creating a data 'web' especially for categories that matter to the analysis. So instead of scanning every customer for `country`, the `country` node can be a hub with `customer`s pointing to it.
+    In graph databases, it is trivial for properties (e.g. `CardNumber`) of a node to be 'promoted' into nodes, creating a data 'web' especially for categories that matter to the analysis. So instead of scanning every customer for `CardNumber`, the `Card` node can be a hub with related `Customer`s, `Purchase`s and `Merchant`s.
 
-    Based on the initial investigation, use cases like fraud detection or merchant analytics can be possible next steps.
+    Based on the initial investigation, use cases like ID collision, state flaws, fraud detection or merchant analytics can be possible next steps.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Duplicate transaction analysis
+
+    As the initial exploration revealed something interesting, the next steps would be to examine the possible reasons for the duplicate transactions, whether fraud can be immediately ruled out, or further graph analysis is required.
     """)
     return
 
@@ -116,11 +145,31 @@ def _(purchases):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Examining duplicate purchases reveal no immediate pattern - the duplicate transactions are uniformly distributed in time and amount. 27 out of 30 merchants and 54 out of 100 cards are involved.
+
+    Purchase data on its own is less useful, and enrichment of this by adding context - `Customer -> Card -> Purchase -> Merchant` would provide a more valuable analysis.
+
+    This is also challenging to analyse transaction-by-transaction, so a graph data science approach of finding possible sub-communities engaging in fraudulent activity can be used.
+    """)
+    return
+
+
 @app.cell
 def _(transfers):
     # same for duplicate transfers
     duplicate_transfers = transfers[transfers.duplicated(subset=['TransactionID'], keep=False)]
     duplicate_transfers
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    For the duplicate `TransactionID`, it appears to be completely different transcations - so possibly a glitch that needs to be flagged for a system investigation.
+    """)
     return
 
 
@@ -137,20 +186,14 @@ def _(mo):
     mo.md(f"""
     ## Graph Data Model
 
-    ### Domain
+    Based on the initial exploration and subsequent questions, the proposed model would need as entities, because we consider them significant: 
 
-    This dataset is a banking customer dataset, summarised in the preceding section.
-
-    Let us load the core graph for single source of truth, using real-world business entities.
-
-    The core graph will evolve as more use-cases emerge.
-
-    ### Core use case - banking
-
-    1. Show all transactions relating to account.
-    2. Which merchants does account purchase from most?
-    3. Show all funds received from other accounts.
-    4. Show all funds transferred to other accounts.
+    - Customer
+    - Merchant
+    - Card
+    - Account
+    - Transfer
+    - Purchase
 
     ### Proposed Core Model
 
@@ -160,12 +203,12 @@ def _(mo):
 
     ### Model Constraints
 
-    Neo4j only supports four constraint kinds: uniqueness, existence, node/edge key (combo of uniqueness and existence) and type. Constraints automatically create backing indexes that help speed up MATCH operations.
+    Neo4j supports four constraint kinds: uniqueness, existence, node/edge key (combo of uniqueness and existence) and type. Constraints automatically create backing indexes that help speed up MATCH operations.
 
-    Customer.CIF, Card.CardNumber, Account.AccountNumber are unique
+    `Customer.CIF, Card.CardNumber, Account.AccountNumber` are unique
     Merchant names are unique (assumed)
 
-    TransactionID is not unique, so either we create a synthetic key (supports idempotent loads) or use CREATE instead of MERGE (simplicity).
+    `TransactionID` is not unique, so either we create a synthetic key (supports idempotent loads) or use CREATE instead of MERGE (simplicity).
 
     ---
 
@@ -173,20 +216,20 @@ def _(mo):
 
     The identified use cases are:
 
-    1. Fraud
+    1. ID Collisions/Fraud
     2. Merchant analytics
 
-    Questions for Fraud
+    Questions for ID Collisions/Fraud
 
     1. Why are `purchases['TransactionID']` not unique?
-    2. Which cards/customers made purchases that are associated with duplicate transactionIDs?
+    2. Which cards/customers made purchases that are associated with duplicate `TransactionID`s?
     3. Why is there a non-unique TransactionID in `transfers`?
-    4. Which customers' transfers are associated with duplicate transactionIDs?
+    4. Which customers' transfers are associated with duplicate `TransactionID`s?
 
     Questions for Merchant analytics
 
     1. Which occupation dominates per merchant?
-    2. What is the median age per merchant?
+    2. Which merchants serve the youngest vs oldest customers?
     """)
     return
 
@@ -338,7 +381,55 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Fraud study
+    ## Duplicate Transaction study
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Why are `purchases['TransactionID']` not unique?
+
+    One of the angles is to observe - of the 42 duplicate purchases, are the amounts the same? This query looks at all purchases where transaction and purchase amount are identical.
+
+    `collect(p)` performs the 'collecting' of duplicates into 1 row and `count(p)` counts the number of duplicate rows.
+    """)
+    return
+
+
+@app.cell
+def _(driver, pd):
+    _q = """
+    MATCH (p:Purchase)
+    // Group by BOTH transactionId and amount
+    WITH p.transactionId AS txId, p.amount AS purchaseAmount, collect(p) AS duplicateNodes, count(p) AS count
+    // Filter for groups that have more than one identical node
+    WHERE count > 1
+    RETURN txId, purchaseAmount, count, duplicateNodes
+    ORDER BY count DESC;
+    """
+
+    with driver.session() as _s:
+        _o = _s.run(_q).data()
+
+    _result = pd.DataFrame(_o)
+    _result
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    There are no duplicate purchases with identical amounts.
+
+    ### Which cards/customers made purchases that are associated with duplicate TransactionIDs?
+
+    This query expands `purchase` context by finding associated customers and merchants (MATCH). Groups all purchase rows by txid and collects distinct CIFs associated with purchase.
+
+    if size(customers) is 1, all duplicate purchases are from same customer/card. Possible replay attack/fraud because same person's card shows the same transcation ID more than once.
+
+    if size(customers) is n (i.e. each duplicate txid belongs to a different customer), this could indicate an ID collision, or non-fraud related unintentional system issue.
     """)
     return
 
@@ -349,7 +440,6 @@ def _(driver, pd):
     MATCH (cust:Customer)-[:HAS_CARD]->(card:Card)-[:FUNDS]->(p:Purchase)-[:PAID_TO]->(m:Merchant)
     WITH p.transactionId AS txid, collect(DISTINCT cust.cif) AS customers, count(*) AS n
     WHERE n > 1
-    // duplicate IDs that span more than one real customer = collision, not a single fraud actor
     RETURN txid, n, customers, size(customers) AS distinctCustomers
     ORDER BY distinctCustomers
     """
@@ -393,6 +483,8 @@ def _(driver, pd):
 def _(mo):
     mo.md(r"""
     Both are in near-equal amounts. Given two different merchants → does not appear to be a clean replay of transaction.
+
+    We can then turn to look into the transactions of this person of interest.
     """)
     return
 
@@ -438,7 +530,10 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    How about the duplicate transfer? It appears a genuine encoding issue with transaction id, because the transfers occured to 4 separate customers with differing amounts.
+    ### Why is there a non-unique TransactionID in transfers?
+    ### Which customers' transfers are associated with duplicate TransactionIDs?
+
+    It appears a genuine encoding issue with transaction id, because the transfers occured to 4 separate customers with differing amounts.
     """)
     return
 
@@ -464,15 +559,15 @@ def _(driver, pd):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Merchant analytics
+    ## Merchant analytics
+
+    ### Which occupation dominates each merchant's customer base?
     """)
     return
 
 
 @app.cell
 def _(alt, driver, mo, pd):
-    # Which occupation dominates each merchant's customer base?
-
     _q = """
     MATCH (cust:Customer)-[:HAS_CARD]->(:Card)-[:FUNDS]->(p:Purchase)-[:PAID_TO]->(m:Merchant)
     WITH m, cust.jobTitle AS job, count(*) AS n
@@ -503,10 +598,16 @@ def _(alt, driver, mo, pd):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Age skew: which merchants serve the youngest vs oldest customers?
+    """)
+    return
+
+
 @app.cell
 def _(alt, driver, mo, pd):
-    # Age skew: which merchants serve the youngest vs oldest customers?
-
     _q = """
     MATCH (cust:Customer)-[:HAS_CARD]->(:Card)-[:FUNDS]->(p:Purchase)-[:PAID_TO]->(m:Merchant)
     RETURN m.name AS merchant,
@@ -541,8 +642,8 @@ def _(alt, driver, mo, pd):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    The results appear to be a result of synthetic data generation.
-    - Age spread of customers per unique merchant is 2 years
+    The results are quite uniform, indicating possible synthetic data.
+    - Age spread of customers per unique merchant is 2 years (between 52 to 54yo)
     - The merchant shares per occupation is uniform
 
     The benefit of cypher
@@ -568,11 +669,22 @@ def _(driver):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Community Detection
+
+    The following runs a GDS community detection algorithm by
+
+    1. Finding a subgraph of transfers (`MATCH`), and storing in a projection (`xfer`)
+    2. Only store the senders and receivers (`s, r`) and transfer amounts (tr.amount) in `xfer`
+    3. transfer amount is used as relationship weight (how important the relationship is)
+    """)
+    return
+
+
 @app.cell
 def _(driver):
-    # Community Detection with GDS
-    # create Account->Account projection 'xfer'
-
     _q = """
     MATCH (s:Account)-[:SENT_TO]->(tr:Transfer)-[:RECEIVED_BY]->(r:Account)
     RETURN gds.graph.project(
@@ -594,17 +706,17 @@ def _(mo):
     mo.md(r"""
     Projection is correct — 100 nodes, 1000 relationships, matching the full transfer set. The graph xfer is now in memory and ready.
 
-    One row, size 100 → single giant component, no isolated rings. Given this near-uniform network; it rules out the "island of accounts only transacting among themselves" fraud pattern.
+    ### WCC - Weakly Connected Components
 
-    Multiple rows, especially small ones (size 2–6) → those small components are immediately interesting — a handful of accounts cut off from the main flow is exactly the structure cycle/mule analysis looks for. Flag any of those for follow-up.
+    GDS WCC algorithm performs the following:
+    1. Look for 'islands' of accounts - rings that traded money with each other only and assign componentId to that island
+    2. Return ID, size of island and up to 10 `accountNumber`s of that island
     """)
     return
 
 
 @app.cell
 def _(driver):
-    # Weakly Connected Components
-
     _q = """
     CALL gds.wcc.stream('xfer') YIELD nodeId, componentId
     RETURN componentId, count(*) AS size,
@@ -621,7 +733,18 @@ def _(driver):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    One component, all 100 accounts — no isolated sub-networks. Every account is reachable from every other through transfer flow. This rules out the cleanest fraud pattern (a ring of accounts transacting only among themselves) and confirms the near-uniform structure
+    One component, all 100 accounts — no isolated sub-networks. Every account is reachable from every other through transfer flow. This rules out the cleanest fraud pattern (rings of accounts transacting only among themselves). But we can confirm
+    if there are roundtripping occuring within this big component by running a cycle detection query (See [below](#finding-roundtripping-transfers)).
+
+    Note:
+
+    One row, size 100 → single giant component, no isolated rings. Given this near-uniform network; it rules out the "island of accounts only transacting among themselves" fraud pattern.
+
+    Multiple rows, especially small ones (size 2–6) → those small components are immediately interesting — a handful of accounts cut off from the main flow is exactly the structure cycle/mule analysis looks for. Flag any of those for follow-up.
+
+    ### Louvain
+
+    GDS also provides Louvain algorithm that finds tight sub-community/network (weights included) within the WCC islands (no weight, just reachability).
     """)
     return
 
@@ -641,6 +764,14 @@ def _(driver):
     with driver.session() as _s:
         _o = _s.run(_q).data()
     _o
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Modularity scores of Louvain measure how well the algorithm could partition the graph. It is a global measure, not an individual community evaluation.
+    """)
     return
 
 
@@ -665,28 +796,40 @@ def _(mo):
     mo.md(r"""
     Modularity 0.15 ≲ 0.3 → communities are weak/arbitrary; the partition is essentially noise. So no meaningful community structure in the transfer graph at this snapshot.
 
-    So the transfer network shows no community structure or isolated components; recommend to include transaction-level monitoring on top of network analysis for this dataset.
+    So the transfer network shows no community structure or isolated components; recommend to include other forms of monitoring (e.g. transaction-level) on top of network analysis for this dataset.
 
     Benefits of GDS
-    - datascience network algorithms: apply mathematically rigourous methods exclusive to graph-organised data for insights
-    - built in : exactly where the data sits for lower latency, higher performance.
+    - Run complex datascience network algorithms: apply mathematically rigourous methods exclusive to graph data for insights
+    - Built in : exactly where the data sits for lower latency, higher performance.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Extra: Finding roundtripping transfers
+
+    We need to cycles and track the time of transactions, because roundtripping fraud is time-ordered.
+
+    ### Direct "ping-pong"
     """)
     return
 
 
 @app.cell
 def _(driver):
-    # if Modularity ≳ 0.4–0.5 with a few mid-sized communities → genuine clustering worth pursuing into cross-referencing community membership against shared customer attributes like country/address.
-    # below just to show cross-referencing community membership with shared 'country' and 'address' attribute
-
     _q = """
-    CALL gds.louvain.stream('xfer') YIELD nodeId, communityId
-    WITH communityId, gds.util.asNode(nodeId) AS acct
-    MATCH (cust:Customer)-[:HAS_ACCOUNT]->(acct)
-    RETURN communityId, count(*) AS members,
-           collect(DISTINCT cust.country) AS countries,
-           collect(DISTINCT cust.address)[..5] AS addresses
-    ORDER BY members DESC;
+    MATCH (a:Account)-[:SENT_TO]->(t1:Transfer)-[:RECEIVED_BY]->(b:Account),
+          (b)-[:SENT_TO]->(t2:Transfer)-[:RECEIVED_BY]->(a)
+    WHERE a.accountNumber < b.accountNumber        // dedupe A-B / B-A
+      AND t2.transferDatetime > t1.transferDatetime
+      AND t2.transferDatetime <= t1.transferDatetime + duration('P3D')  // "closes the loop" quickly
+    RETURN a.accountNumber AS acctA, b.accountNumber AS acctB,
+           t1.transactionId AS out_tx, t1.amount AS out_amt, t1.transferDatetime AS out_time,
+           t2.transactionId AS return_tx, t2.amount AS return_amt, t2.transferDatetime AS return_time,
+           abs(t1.amount - t2.amount) AS amountDelta
+    ORDER BY amountDelta ASC, out_time ASC;
     """
 
     with driver.session() as _s:
@@ -695,11 +838,72 @@ def _(driver):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    No results - hence, there are no simple, common cases of "ping pong" transfers - account A -> B, and back to -> A.
+
+    ### Variable length, N-hops (A->B->C->...->A) with intermediate account revisit
+
+    This is the layering of several accounts before returning to origin for paths between 4 and 12 relationships, or 2 and 6 transfers inclusive (each transfer being 2 relationships).
+    """)
+    return
+
+
 @app.cell
 def _(driver):
-    # cleanup
+    _q = """
+    MATCH path = (a:Account)-[:SENT_TO|RECEIVED_BY*4..12]->(a)
+    WITH path, a,
+         [n IN nodes(path) WHERE n:Transfer] AS transfers
+    WHERE length(path) % 2 = 0                                   // ends on an Account, not mid-Transfer
+      AND all(i IN range(0, size(transfers)-2)
+              WHERE transfers[i].transferDatetime <= transfers[i+1].transferDatetime)  // money can't flow backward in time
+      AND duration.between(transfers[0].transferDatetime, transfers[-1].transferDatetime).days <= 7
+    RETURN a.accountNumber AS originAccount,
+           [t IN transfers | t.transactionId] AS txChain,
+           [t IN transfers | t.amount] AS amounts,
+           [t IN transfers | t.transferDatetime] AS times,
+           abs(transfers[0].amount - transfers[-1].amount) AS amountDrift
+    ORDER BY size(txChain) ASC, amountDrift ASC
+    LIMIT 25;
+    """
+
     with driver.session() as _s:
-        _o = _s.run("CALL gds.graph.drop('xfer');").data()
+        _o = _s.run(_q).data()
+    _o
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    25 potential roundtripping cycles (of up to 6 transfer hops) were identified. Cycles may occur naturally, so further investigation is required. Options include:
+
+    - Scoring and ranking suspicious accounts
+    - Enriching account information for context
+    - Cross-referencing other signals (e.g. duplicate transactions)
+    - Human intervention
+
+    Notes:
+
+    This query can be simplified by adding a new, direct edge `TRANSFERRED` to Accounts - `(Account)-[:TRANSFERRED {transactionId, amount, transferDatetime}]->(Account)`, which would simplify to
+
+    ```cypher
+    MATCH path = (a:Account)-[:TRANSFERRED*2..6]->(a)
+    WHERE all(i IN range(0, size(relationships(path))-2)
+              WHERE relationships(path)[i].transferDatetime <= relationships(path)[i+1].transferDatetime)
+    RETURN a, relationships(path)
+    ```
+    """)
+    return
+
+
+@app.cell
+def _(driver):
+    # cleanup, failIfMissing = false (acts like IF EXISTS)
+    with driver.session() as _s:
+        _o = _s.run("CALL gds.graph.drop('xfer', false) YIELD graphName;").data()
     _o
     return
 

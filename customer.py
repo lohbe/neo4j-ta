@@ -887,7 +887,7 @@ def _(mo):
 
     Notes:
 
-    This query can be simplified by adding a new, direct edge `TRANSFERRED` to Accounts - `(Account)-[:TRANSFERRED {transactionId, amount, transferDatetime}]->(Account)`, which would simplify to
+    This query can be simplified and sped up by adding a new, direct edge `TRANSFERRED` to Accounts - `(Account)-[:TRANSFERRED {transactionId, amount, transferDatetime}]->(Account)`, which would simplify to
 
     ```cypher
     MATCH path = (a:Account)-[:TRANSFERRED*2..6]->(a)

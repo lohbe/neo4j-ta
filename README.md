@@ -1,4 +1,4 @@
-# Neo4j — Banking Fraud Demo
+# Neo4j — Banking Data Investigation Demo
 
 A solutions-engineering demo for Neo4j, built around a synthetic banking dataset.
 It pairs a live, runnable [Marimo](https://marimo.io) notebook with a banking customer

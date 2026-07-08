@@ -5,6 +5,11 @@ set default-list := true
 deck:
   npx --yes live-server --port=4321 --watch=business.md,theme.css,index.html .
 
+# Export the slide deck to PDF via decktape (start the server first: `just deck`)
+[working-directory: 'deck']
+export-pdf:
+  PUPPETEER_EXECUTABLE_PATH="/Applications/Chromium.app/Contents/MacOS/Chromium" npx --yes decktape reveal -s 1280x760 http://localhost:4321/ preso.pdf
+
 [working-directory: '/opt/homebrew/var/neo4j/data']
 reset:
   neo4j stop
